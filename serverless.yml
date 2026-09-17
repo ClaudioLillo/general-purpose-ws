@@ -1,0 +1,52 @@
+service: general-purpose-ws
+
+params:
+  dev:
+    jwtSecret: "development-jwt-secret"
+  prod:
+    jwtSecret: ${ssm:/general-purpose-ws/jwt-secret}
+
+provider:
+  name: aws
+  runtime: nodejs22.x
+  websocketsApiName: general-purpose-ws-api
+  websocketsApiRouteSelectionExpression: $request.body.action
+  websocketsDescription: General Purpose Websockets
+
+# Requerido para serverless-v4 en lugar de usar el plugin para typscript
+build:
+  esbuild:
+    bundle: true
+    minify: false
+
+plugins:
+  - serverless-offline
+
+functions:
+  authWebSocket:
+    handler: authorizer.handler
+    environment:
+      JWT_SECRET: ${param:jwtSecret}
+  connectHandler:
+    handler: index.connect
+    events:
+      - websocket:
+          route: $connect
+          authorizer:
+            name: authWebSocket
+            identitySource:
+              - route.request.querystring.token
+  disconnectHandler:
+    handler: index.disconnect
+    events:
+      - websocket:
+          route: $disconnect
+  defaultHandler:
+    handler: index.defaultHandler
+    events:
+      - websocket: $default
+  sendMessageHandler:
+    handler: index.sendMessage
+    events:
+      - websocket:
+          route: sendMessage
